@@ -81,7 +81,7 @@ func ConfigFileOutput(logHandlers *[]slog.EntryHandler, lvl slf.Level, fileName 
 	bHandler := New(lvl)
 	logfd, err := os.OpenFile(fileName, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0644)
 	if err != nil {
-		SafeLog("[basiclog.go] Error: could not open/create logfile: " + fileName)
+		fmt.Fprintf(os.Stderr, "[basiclog.go] Error: could not open/create logfile: %s\n", fileName)
 	}
 
 	bHandler.SetWriter(logfd)

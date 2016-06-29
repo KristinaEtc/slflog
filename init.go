@@ -1,10 +1,14 @@
 package slflog
 
 import (
+	"encoding/json"
+	"fmt"
 	"github.com/kardianos/osext"
 	"github.com/ventu-io/slf"
 	"github.com/ventu-io/slog"
+	"io/ioutil"
 	"os"
+	"path"
 	"path/filepath"
 )
 
@@ -21,8 +25,46 @@ const (
 	debugFilename = "debug.log"
 )
 
+type Config struct {
+	ConsoleLvl string `json:ConsoleLvl`
+	Logpath    string `json:Logpath`
+	Filenames  fNames `json:Filenames`
+}
+
+type fNames struct {
+	Errors string `json:Errors`
+	Info   string `json:Info`
+	Debug  string `json:Debug`
+}
+
+var conf = &Config{
+	Filenames: fNames{Errors: "errors.log", Info: "info.log", Debug: "debug.log"},
+}
+
+func init() {
+
+	filename, err := osext.Executable()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "[slflog] Error: could not get a path to binary file for creating logdir: %s\n", err.Error())
+	}
+	filepath := path.Dir(filename)
+	fmt.Fprintf(os.Stderr, "[slflog] Configlog.json will be founded on %s directory\n", filepath)
+
+	file, e := ioutil.ReadFile("configlog.json")
+	if e != nil {
+		fmt.Fprintf(os.Stderr, "[slflog] Config logfile error: %s\n", e.Error())
+	}
+
+	if err := json.Unmarshal([]byte(file), &conf); err != nil {
+		fmt.Fprintf(os.Stderr, "[slflog] Config logfile error: %s\n", err.Error())
+	}
+	fmt.Printf("Results: %v\n", conf)
+
+	initLoggers(conf.Logpath, conf.ConsoleLvl)
+}
+
 // Init loggers
-func InitLoggers(logpath string, loglvl string) {
+func initLoggers(logpath string, loglvl string) {
 
 	var logHandlers []slog.EntryHandler
 
@@ -33,7 +75,7 @@ func InitLoggers(logpath string, loglvl string) {
 
 	err := setLogOutput(&logHandlers, logpath)
 	if err != nil {
-		SafeLog("[go-stomp-server] Error init loggers: " + err.Error() + "\n")
+		fmt.Fprintf(os.Stderr, "[slflog] Error init loggers: %s\n", err.Error())
 	}
 
 	lf = slog.New()
@@ -59,9 +101,11 @@ func setLogOutput(logHandlers *[]slog.EntryHandler, logpath string) error {
 		}
 	}
 
-	ConfigFileOutput(logHandlers, slf.LevelDebug, filepath.Join(pathForLogs, debugFilename))
-	ConfigFileOutput(logHandlers, slf.LevelInfo, filepath.Join(pathForLogs, infoFilename))
-	ConfigFileOutput(logHandlers, slf.LevelError, filepath.Join(pathForLogs, errorFilename))
+	conf.Logpath = pathForLogs
+
+	ConfigFileOutput(logHandlers, slf.LevelDebug, filepath.Join(conf.Logpath, conf.Filenames.Debug))
+	ConfigFileOutput(logHandlers, slf.LevelInfo, filepath.Join(conf.Logpath, conf.Filenames.Info))
+	ConfigFileOutput(logHandlers, slf.LevelError, filepath.Join(conf.Logpath, conf.Filenames.Errors))
 
 	return nil
 }
