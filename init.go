@@ -19,28 +19,28 @@ var (
 	log                                                  slf.StructuredLogger
 )
 
-const (
+/*const (
 	errorFilename = "error.log"
 	infoFilename  = "info.log"
 	debugFilename = "debug.log"
-)
+)*/
 
+// Struct for log config.
 type Config struct {
-	ConsoleLvl string `json:ConsoleLvl`
-	Logpath    string `json:Logpath`
-	Filenames  fNames `json:Filenames`
-}
-
-type fNames struct {
-	Errors string `json:Errors`
-	Info   string `json:Info`
-	Debug  string `json:Debug`
+	StderrLvl string            `json:StderrLvl`
+	Logpath   string            `json:Logpath`
+	Filenames map[string]string `json:Filenames`
 }
 
 var conf = &Config{
-	Filenames: fNames{Errors: "errors.log", Info: "info.log", Debug: "debug.log"},
+	Filenames: map[string]string{"ERROR": "errorrrrrs.log", "INFO": "info.log", "DEBUG": "debug.log"},
+	StderrLvl: "DEBUG",
 }
 
+const configLogfile string = "configlog.json"
+
+// Searching configuration log file.
+// Parsing configuration on it. If file doesn't exist, use default settings.
 func init() {
 
 	filename, err := osext.Executable()
@@ -50,20 +50,25 @@ func init() {
 	filepath := path.Dir(filename)
 	fmt.Fprintf(os.Stderr, "[slflog] Configlog.json will be founded on %s directory\n", filepath)
 
-	file, e := ioutil.ReadFile("configlog.json")
-	if e != nil {
-		fmt.Fprintf(os.Stderr, "[slflog] Config logfile error: %s\n", e.Error())
-	}
+	// Default logpath - aDirectoryWithBinaryFile/logs.
+	fpath := filepath + string(os.PathSeparator) + "logs"
+	conf.Logpath = fpath
 
-	if err := json.Unmarshal([]byte(file), &conf); err != nil {
+	// Parsing configlog.json
+	file, err := ioutil.ReadFile(configLogfile)
+	if err != nil {
 		fmt.Fprintf(os.Stderr, "[slflog] Config logfile error: %s\n", err.Error())
 	}
-	fmt.Printf("Results: %v\n", conf)
+	var userConfig = &Config{}
+	err = json.Unmarshal(file, &userConfig)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "[slflog] Config logfile error: %s\n", err.Error())
+	}
 
-	initLoggers(conf.Logpath, conf.ConsoleLvl)
+	initLoggers(conf.Logpath, conf.StderrLvl)
 }
 
-// Init loggers
+// Init loggers: writers, log output, entry handlers.
 func initLoggers(logpath string, loglvl string) {
 
 	var logHandlers []slog.EntryHandler
@@ -103,9 +108,9 @@ func setLogOutput(logHandlers *[]slog.EntryHandler, logpath string) error {
 
 	conf.Logpath = pathForLogs
 
-	ConfigFileOutput(logHandlers, slf.LevelDebug, filepath.Join(conf.Logpath, conf.Filenames.Debug))
-	ConfigFileOutput(logHandlers, slf.LevelInfo, filepath.Join(conf.Logpath, conf.Filenames.Info))
-	ConfigFileOutput(logHandlers, slf.LevelError, filepath.Join(conf.Logpath, conf.Filenames.Errors))
+	ConfigFileOutput(logHandlers, slf.LevelDebug, filepath.Join(conf.Logpath, conf.Filenames["DEBUG"]))
+	ConfigFileOutput(logHandlers, slf.LevelInfo, filepath.Join(conf.Logpath, conf.Filenames["INFO"]))
+	ConfigFileOutput(logHandlers, slf.LevelError, filepath.Join(conf.Logpath, conf.Filenames["ERROR"]))
 
 	return nil
 }
@@ -126,7 +131,7 @@ func getPathForLogDir(logpath string) (string, error) {
 	}
 }
 
-// exists returns whether the given file or directory exists or not
+// Exists returns whether the given file or directory exists or not.
 func exists(path string) (bool, error) {
 
 	_, err := os.Stat(path)
@@ -139,6 +144,7 @@ func exists(path string) (bool, error) {
 	return false, err
 }
 
+// Format string to slf.Level.
 func getLogLevel(lvl string) slf.Level {
 
 	switch lvl {
@@ -161,4 +167,26 @@ func getLogLevel(lvl string) slf.Level {
 	default:
 		return slf.LevelDebug
 	}
+}
+
+// Fill in the blank fields of config structure with default values from confDefault.
+func fillConfig(userConfig *Config) {
+
+	if userConfig.Logpath == "" {
+		userConfig.Logpath = conf.Logpath
+	}
+	if userConfig.StderrLvl == "" {
+		userConfig.StderrLvl = conf.StderrLvl
+	}
+	if _, exist := userConfig.Filenames["ERROR"]; !exist {
+		userConfig.Filenames["ERROR"] = conf.Filenames["ERROR"]
+	}
+	if _, exist := userConfig.Filenames["INFO"]; !exist {
+		userConfig.Filenames["INFO"] = conf.Filenames["INFO"]
+	}
+	if _, exist := userConfig.Filenames["DEBUG"]; !exist {
+		userConfig.Filenames["DEBUG"] = conf.Filenames["DEBUG"]
+	}
+
+	conf = userConfig
 }
