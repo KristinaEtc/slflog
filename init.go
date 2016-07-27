@@ -3,13 +3,13 @@ package slflog
 import (
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"os"
+	"path/filepath"
+
 	"github.com/kardianos/osext"
 	"github.com/ventu-io/slf"
 	"github.com/ventu-io/slog"
-	"io/ioutil"
-	"os"
-	"path"
-	"path/filepath"
 )
 
 var (
@@ -27,45 +27,70 @@ var (
 
 // Struct for log config.
 type Config struct {
-	StderrLvl string            `json:StderrLvl`
-	Logpath   string            `json:Logpath`
-	Filenames map[string]string `json:Filenames`
+	StderrLvl string
+	Logpath   string
+	Filenames map[string]string
 }
 
 var conf = &Config{
-	Filenames: map[string]string{"ERROR": "errorrrrrs.log", "INFO": "info.log", "DEBUG": "debug.log"},
+	Filenames: map[string]string{"ERROR": "errors.log", "INFO": "info.log", "DEBUG": "debug.log"},
 	StderrLvl: "DEBUG",
+	Logpath:   "",
 }
 
-const configLogfile string = "configlog.json"
+var configLogPath string = ""
 
 // Searching configuration log file.
 // Parsing configuration on it. If file doesn't exist, use default settings.
 func init() {
 
-	filename, err := osext.Executable()
+	//
+	// setting a default log path directory
+	//
+	binaryPath, err := osext.Executable()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "[slflog] Error: could not get a path to binary file for creating logdir: %s\n", err.Error())
+	} else {
+		conf.Logpath = binaryPath + "-logs"
 	}
-	filepath := path.Dir(filename)
-	fmt.Fprintf(os.Stderr, "[slflog] Configlog.json will be founded on %s directory\n", filepath)
 
-	// Default logpath - aDirectoryWithBinaryFile/logs.
-	fpath := filepath + string(os.PathSeparator) + "logs"
-	conf.Logpath = fpath
+	//
+	// setting log options from configfile
+	//
+
+	// configLogPath was setted by a linker value
+	if configLogPath != "" {
+		exist, err := exists(configLogPath)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "[slflog] Error: wrong logger configure file from linker value %s: %s\n", configLogPath, err.Error())
+			configLogPath = ""
+		} else if exist != true {
+			fmt.Fprintf(os.Stderr, "[slflog] Error: Logger configure file from linker value %s: does not exist\n", configLogPath)
+			configLogPath = ""
+		}
+	}
+
+	// no path from a linker value or wrong linker value; searching where a binary is situated
+	if configLogPath == "" {
+		configLogPath = binaryPath + ".logconfig"
+		fmt.Fprintf(os.Stderr, "[slflog] Configlog will be founded in [%s] file\n", configLogPath)
+	}
 
 	// Parsing configlog.json
-	file, err := ioutil.ReadFile(configLogfile)
+	file, err := ioutil.ReadFile(configLogPath)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "[slflog] Config logfile error: %s\n", err.Error())
+		fmt.Fprintf(os.Stderr, "[slflog] Config logfile error: %s.\n Will be used debault options for logger.\n", err.Error())
+	} else {
+		var userConfig = &Config{}
+		err = json.Unmarshal(file, &userConfig)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "[slflog] Config logfile error: %s\nWill be used debault options for logger.\n", err.Error())
+			initLoggers(conf.Logpath, conf.StderrLvl)
+		} else {
+			//fmt.Printf("logpath=%s\n", conf.Logpath)
+			initLoggers(userConfig.Logpath, userConfig.StderrLvl)
+		}
 	}
-	var userConfig = &Config{}
-	err = json.Unmarshal(file, &userConfig)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "[slflog] Config logfile error: %s\n", err.Error())
-	}
-
-	initLoggers(conf.Logpath, conf.StderrLvl)
 }
 
 // Init loggers: writers, log output, entry handlers.
