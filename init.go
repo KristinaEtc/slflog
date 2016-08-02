@@ -38,7 +38,7 @@ var conf = &Config{
 	Logpath:   "",
 }
 
-var configLogPath string = ""
+var configLogFile string = ""
 
 // Searching configuration log file.
 // Parsing configuration on it. If file doesn't exist, use default settings.
@@ -59,25 +59,25 @@ func init() {
 	//
 
 	// configLogPath was setted by a linker value
-	if configLogPath != "" {
-		exist, err := exists(configLogPath)
+	if configLogFile != "" {
+		exist, err := exists(configLogFile)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "[slflog] Error: wrong logger configure file from linker value %s: %s\n", configLogPath, err.Error())
-			configLogPath = ""
+			fmt.Fprintf(os.Stderr, "[slflog] Error: wrong logger configure file from linker value %s: %s\n", configLogFile, err.Error())
+			configLogFile = ""
 		} else if exist != true {
-			fmt.Fprintf(os.Stderr, "[slflog] Error: Logger configure file from linker value %s: does not exist\n", configLogPath)
-			configLogPath = ""
+			fmt.Fprintf(os.Stderr, "[slflog] Error: Logger configure file from linker value %s: does not exist\n", configLogFile)
+			configLogFile = ""
 		}
 	}
 
 	// no path from a linker value or wrong linker value; searching where a binary is situated
-	if configLogPath == "" {
-		configLogPath = binaryPath + ".logconfig"
-		fmt.Fprintf(os.Stderr, "[slflog] Configlog will be founded in [%s] file\n", configLogPath)
+	if configLogFile == "" {
+		configLogFile = binaryPath + ".logconfig"
+		fmt.Fprintf(os.Stderr, "[slflog] Configlog file that will be used: [%s]\n", configLogFile)
 	}
 
 	// Parsing configlog.json
-	file, err := ioutil.ReadFile(configLogPath)
+	file, err := ioutil.ReadFile(configLogFile)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "[slflog] Config logfile error: %s.\n Will be used debault options for logger.\n", err.Error())
 	} else {
