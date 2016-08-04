@@ -32,6 +32,11 @@ type Config struct {
 	Filenames map[string]string
 }
 
+// ConfFile is a file with all program options
+type ConfFile struct {
+	Logs Config
+}
+
 var conf = &Config{
 	Filenames: map[string]string{"ERROR": "errors.log", "INFO": "info.log", "DEBUG": "debug.log"},
 	StderrLvl: "DEBUG",
@@ -54,11 +59,6 @@ func init() {
 		conf.Logpath = binaryPath + "-logs"
 	}
 
-	//
-	// setting log options from configfile
-	//
-
-	// configLogPath was setted by a linker value
 	if configLogFile != "" {
 		exist, err := exists(configLogFile)
 		if err != nil {
@@ -72,7 +72,7 @@ func init() {
 
 	// no path from a linker value or wrong linker value; searching where a binary is situated
 	if configLogFile == "" {
-		configLogFile = binaryPath + ".logconfig"
+		configLogFile = binaryPath + ".config"
 		fmt.Fprintf(os.Stderr, "[slflog] Configlog file that will be used: [%s]\n", configLogFile)
 	}
 
@@ -81,14 +81,13 @@ func init() {
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "[slflog] Config logfile error: %s.\n Will be used debault options for logger.\n", err.Error())
 	} else {
-		var userConfig = &Config{}
-		err = json.Unmarshal(file, &userConfig)
+		var cf ConfFile
+		err = json.Unmarshal(file, &cf)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "[slflog] Config logfile error: %s\nWill be used debault options for logger.\n", err.Error())
 			initLoggers(conf.Logpath, conf.StderrLvl)
 		} else {
-			//fmt.Printf("logpath=%s\n", conf.Logpath)
-			initLoggers(userConfig.Logpath, userConfig.StderrLvl)
+			initLoggers(cf.Logs.Logpath, cf.Logs.StderrLvl)
 		}
 	}
 }
@@ -199,19 +198,16 @@ func fillConfig(userConfig *Config) {
 
 	if userConfig.Logpath == "" {
 		userConfig.Logpath = conf.Logpath
-	}
-	if userConfig.StderrLvl == "" {
+	} else if userConfig.StderrLvl == "" {
 		userConfig.StderrLvl = conf.StderrLvl
-	}
-	if _, exist := userConfig.Filenames["ERROR"]; !exist {
+	} else if _, exist := userConfig.Filenames["ERROR"]; !exist {
 		userConfig.Filenames["ERROR"] = conf.Filenames["ERROR"]
-	}
-	if _, exist := userConfig.Filenames["INFO"]; !exist {
+	} else if _, exist := userConfig.Filenames["INFO"]; !exist {
 		userConfig.Filenames["INFO"] = conf.Filenames["INFO"]
-	}
-	if _, exist := userConfig.Filenames["DEBUG"]; !exist {
+	} else if _, exist := userConfig.Filenames["DEBUG"]; !exist {
 		userConfig.Filenames["DEBUG"] = conf.Filenames["DEBUG"]
+	} else {
+		log.WithCaller(slf.CallerShort).Warnf("Wrong config level: %s", userConfig.Logpath)
 	}
-
 	conf = userConfig
 }

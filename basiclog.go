@@ -9,14 +9,15 @@ package slflog
 
 import (
 	"fmt"
-	"github.com/ventu-io/slf"
-	"github.com/ventu-io/slog"
 	"io"
 	"os"
 	"sort"
 	"strings"
 	"sync"
 	"text/template"
+
+	"github.com/ventu-io/slf"
+	"github.com/ventu-io/slog"
 )
 
 const (
