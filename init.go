@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"runtime"
 
 	"github.com/kardianos/osext"
 	"github.com/ventu-io/slf"
@@ -19,12 +20,6 @@ var (
 	log                                                  slf.StructuredLogger
 )
 
-/*const (
-	errorFilename = "error.log"
-	infoFilename  = "info.log"
-	debugFilename = "debug.log"
-)*/
-
 // Struct for log config.
 type Config struct {
 	StderrLvl string
@@ -37,11 +32,11 @@ type ConfFile struct {
 	Logs Config
 }
 
-var conf = &Config{
+var defaultConf = ConfFile{Config{
 	Filenames: map[string]string{"ERROR": "errors.log", "INFO": "info.log", "DEBUG": "debug.log"},
 	StderrLvl: "DEBUG",
 	Logpath:   "",
-}
+}}
 
 var configLogFile string = ""
 
@@ -49,60 +44,22 @@ var configLogFile string = ""
 // Parsing configuration on it. If file doesn't exist, use default settings.
 func init() {
 
-	//
-	// setting a default log path directory
-	//
-	binaryPath, err := osext.Executable()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "[slflog] Error: could not get a path to binary file for creating logdir: %s\n", err.Error())
-	} else {
-		conf.Logpath = binaryPath + "-logs"
-	}
-
-	if configLogFile != "" {
-		exist, err := exists(configLogFile)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "[slflog] Error: wrong logger configure file from linker value %s: %s\n", configLogFile, err.Error())
-			configLogFile = ""
-		} else if exist != true {
-			fmt.Fprintf(os.Stderr, "[slflog] Error: Logger configure file from linker value %s: does not exist\n", configLogFile)
-			configLogFile = ""
-		}
-	}
-
-	// no path from a linker value or wrong linker value; searching where a binary is situated
-	if configLogFile == "" {
-		configLogFile = binaryPath + ".config"
-		fmt.Fprintf(os.Stderr, "[slflog] Configlog file that will be used: [%s]\n", configLogFile)
-	}
-
-	// Parsing configlog.json
-	file, err := ioutil.ReadFile(configLogFile)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "[slflog] Config logfile error: %s.\n Will be used debault options for logger.\n", err.Error())
-	} else {
-		var cf ConfFile
-		err = json.Unmarshal(file, &cf)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "[slflog] Config logfile error: %s\nWill be used debault options for logger.\n", err.Error())
-			initLoggers(conf.Logpath, conf.StderrLvl)
-		} else {
-			initLoggers(cf.Logs.Logpath, cf.Logs.StderrLvl)
-		}
-	}
+	var cf ConfFile
+	getFromGlobalConf(&(cf), defaultConf, "Logs")
+	initLoggers(cf.Logs)
 }
 
 // Init loggers: writers, log output, entry handlers.
-func initLoggers(logpath string, loglvl string) {
+func initLoggers(logC Config) {
 
 	var logHandlers []slog.EntryHandler
 
 	// optionally define the format (this here is the default one)
 	//bhInfo.SetTemplate("{{.Time}} [\033[{{.Color}}m{{.Level}}\033[0m] {{.Context}}{{if .Caller}} ({{.Caller}}){{end}}: {{.Message}}{{if .Error}} (\033[31merror: {{.Error}}\033[0m){{end}} {{.Fields}}")
 
-	ConfigWriterOutput(&logHandlers, getLogLevel(loglvl), os.Stderr)
+	ConfigWriterOutput(&logHandlers, getLogLevel(logC.StderrLvl), os.Stderr)
 
-	err := setLogOutput(&logHandlers, logpath)
+	err := setLogOutput(&logHandlers, logC)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "[slflog] Error init loggers: %s\n", err.Error())
 	}
@@ -113,9 +70,9 @@ func initLoggers(logpath string, loglvl string) {
 	slf.Set(lf)
 }
 
-func setLogOutput(logHandlers *[]slog.EntryHandler, logpath string) error {
+func setLogOutput(logHandlers *[]slog.EntryHandler, logC Config) error {
 
-	pathForLogs, err := getPathForLogDir(logpath)
+	pathForLogs, err := getPathForLogDir(logC.Logpath)
 	if err != nil {
 		return err
 	}
@@ -130,14 +87,44 @@ func setLogOutput(logHandlers *[]slog.EntryHandler, logpath string) error {
 		}
 	}
 
-	conf.Logpath = pathForLogs
+	logC.Logpath = pathForLogs
 
-	ConfigFileOutput(logHandlers, slf.LevelDebug, filepath.Join(conf.Logpath, conf.Filenames["DEBUG"]))
-	ConfigFileOutput(logHandlers, slf.LevelInfo, filepath.Join(conf.Logpath, conf.Filenames["INFO"]))
-	ConfigFileOutput(logHandlers, slf.LevelError, filepath.Join(conf.Logpath, conf.Filenames["ERROR"]))
+	ConfigFileOutput(logHandlers, slf.LevelDebug, filepath.Join(logC.Logpath, logC.Filenames["DEBUG"]))
+	ConfigFileOutput(logHandlers, slf.LevelInfo, filepath.Join(logC.Logpath, logC.Filenames["INFO"]))
+	ConfigFileOutput(logHandlers, slf.LevelError, filepath.Join(logC.Logpath, logC.Filenames["ERROR"]))
 
 	return nil
 }
+
+// Format string to slf.Level.
+func getLogLevel(lvl string) slf.Level {
+
+	switch lvl {
+	case slf.LevelDebug.String():
+		return slf.LevelDebug
+
+	case slf.LevelInfo.String():
+		return slf.LevelInfo
+
+	case slf.LevelWarn.String():
+		return slf.LevelWarn
+
+	case slf.LevelError.String():
+		return slf.LevelError
+
+	case slf.LevelFatal.String():
+		return slf.LevelFatal
+	case slf.LevelPanic.String():
+		return slf.LevelPanic
+	default:
+		return slf.LevelDebug
+	}
+}
+
+//----------------------------------------------------------------------------------------//
+// Common utils for logger. Do not move it to another library (like KristinaEtc/utils c:),
+// because logger _must_ initialize first.
+//----------------------------------------------------------------------------------------//
 
 func getPathForLogDir(logpath string) (string, error) {
 
@@ -168,31 +155,41 @@ func exists(path string) (bool, error) {
 	return false, err
 }
 
-// Format string to slf.Level.
-func getLogLevel(lvl string) slf.Level {
+// GetGlobalConf unmarshal json-object cf
+// If parsing was not successuful, function return a structure with default options
+func getFromGlobalConf(cf interface{}, defaultVal interface{}, whatParsed string) {
 
-	switch lvl {
-	case slf.LevelDebug.String():
-		return slf.LevelDebug
-
-	case slf.LevelInfo.String():
-		return slf.LevelInfo
-
-	case slf.LevelWarn.String():
-		return slf.LevelWarn
-
-	case slf.LevelError.String():
-		return slf.LevelError
-
-	case slf.LevelFatal.String():
-		return slf.LevelFatal
-	case slf.LevelPanic.String():
-		return slf.LevelPanic
-	default:
-		return slf.LevelDebug
+	file, e := ioutil.ReadFile(getConfigFilename())
+	if e != nil {
+		fmt.Fprintf(os.Stderr, "[slflog] Error: %s\n", e.Error())
 	}
+
+	if err := json.Unmarshal([]byte(file), cf); err != nil {
+		fmt.Fprintf(os.Stderr, "[slflog] Error parsing JSON : [%s]. For %s will be used defaulf options.\n",
+			whatParsed, err.Error())
+		cf = defaultVal
+	} else {
+		fmt.Fprintf(os.Stderr, "[slflog] Parsed [%s] configuration from [%s] file.\n", whatParsed, getConfigFilename())
+	}
+	//log.Debugf("%v", cf)
 }
 
+// GetConfigFilename is a function fot getting a name of a binary with full path to it
+func getConfigFilename() string {
+	binaryPath, err := osext.Executable()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "[slflog] Error: could not get a path to binary file: %s\n", err.Error())
+	}
+	if runtime.GOOS == "windows" {
+		// without ".exe"
+		binaryPath = binaryPath[:len(binaryPath)-4]
+		fmt.Fprintf(os.Stderr, "[slflog] Configfile for windows")
+	}
+
+	return binaryPath + ".config"
+}
+
+/*
 // Fill in the blank fields of config structure with default values from confDefault.
 func fillConfig(userConfig *Config) {
 
@@ -210,4 +207,4 @@ func fillConfig(userConfig *Config) {
 		log.WithCaller(slf.CallerShort).Warnf("Wrong config level: %s", userConfig.Logpath)
 	}
 	conf = userConfig
-}
+}*/
