@@ -1,13 +1,11 @@
 package slflog
 
 import (
-	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
-	"runtime"
 
+	"github.com/KristinaEtc/config"
 	"github.com/kardianos/osext"
 	"github.com/ventu-io/slf"
 	"github.com/ventu-io/slog"
@@ -32,21 +30,23 @@ type ConfFile struct {
 	Logs Config
 }
 
-var defaultConf = ConfFile{Config{
-	Filenames: map[string]string{"ERROR": "errors.log", "INFO": "info.log", "DEBUG": "debug.log"},
-	StderrLvl: "DEBUG",
-	Logpath:   "",
-}}
+var logConfig = ConfFile{
+	Logs: Config{
+		Filenames: map[string]string{"ERROR": "errors.log", "INFO": "info.log", "DEBUG": "debug.log"},
+		StderrLvl: "DEBUG",
+		Logpath:   "",
+	},
+}
 
-var configLogFile string = ""
+//var configLogFile string = ""
 
 // Searching configuration log file.
 // Parsing configuration on it. If file doesn't exist, use default settings.
 func init() {
 
-	var cf ConfFile
-	getFromGlobalConf(&(cf), defaultConf, "Logs")
-	initLoggers(cf.Logs)
+	//var cf ConfFile = defaultConf
+	config.ReadGlobalConfig(&logConfig, "Logs")
+	initLoggers(logConfig.Logs)
 }
 
 // Init loggers: writers, log output, entry handlers.
@@ -128,16 +128,16 @@ func getPathForLogDir(logpath string) (string, error) {
 
 	if filepath.IsAbs(logpath) == true {
 		return logpath, nil
-	} else {
-		filename, err := osext.Executable()
-		if err != nil {
-			return "", err
-		}
-
-		fpath := filepath.Dir(filename)
-		fpath = filepath.Join(fpath, logpath)
-		return fpath, nil
 	}
+	filename, err := osext.Executable()
+	if err != nil {
+		return "", err
+	}
+
+	fpath := filepath.Dir(filename)
+	fpath = filepath.Join(fpath, logpath)
+	return fpath, nil
+
 }
 
 // Exists returns whether the given file or directory exists or not.
@@ -153,6 +153,7 @@ func exists(path string) (bool, error) {
 	return false, err
 }
 
+/*
 // GetGlobalConf unmarshal json-object cf
 // If parsing was not successuful, function return a structure with default options
 func getFromGlobalConf(cf interface{}, defaultVal interface{}, whatParsed string) {
@@ -186,6 +187,8 @@ func getConfigFilename() string {
 
 	return binaryPath + ".config"
 }
+
+*/
 
 /*
 // Fill in the blank fields of config structure with default values from confDefault.
