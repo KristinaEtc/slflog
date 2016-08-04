@@ -54,9 +54,6 @@ func initLoggers(logC Config) {
 
 	var logHandlers []slog.EntryHandler
 
-	// optionally define the format (this here is the default one)
-	//bhInfo.SetTemplate("{{.Time}} [\033[{{.Color}}m{{.Level}}\033[0m] {{.Context}}{{if .Caller}} ({{.Caller}}){{end}}: {{.Message}}{{if .Error}} (\033[31merror: {{.Error}}\033[0m){{end}} {{.Fields}}")
-
 	ConfigWriterOutput(&logHandlers, getLogLevel(logC.StderrLvl), os.Stderr)
 
 	err := setLogOutput(&logHandlers, logC)
@@ -65,6 +62,7 @@ func initLoggers(logC Config) {
 	}
 
 	lf = slog.New()
+
 	lf.SetLevel(slf.LevelDebug)
 	lf.SetEntryHandlers(logHandlers...)
 	slf.Set(lf)

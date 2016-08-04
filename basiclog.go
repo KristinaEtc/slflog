@@ -37,7 +37,8 @@ const (
 	StandardTextTemplate = "{{.Time}} [{{.Level}}] {{.Context}}{{if .Caller}} ({{.Caller}}){{end}}: {{.Message}}{{if .Error}} (error: {{.Error}}){{end}} {{.Fields}}"
 
 	// StandardTimeFormat represents the time format used in the handler by default.
-	StandardTimeFormat = "15:04:05.000"
+	// ISO 8601
+	StandardTimeFormat = "2006-01-02/15:04:05.000"
 )
 
 // Handler represents a log entry handler capable of formatting structured log data into
