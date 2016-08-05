@@ -64,6 +64,11 @@ func initLoggers(logC Config) {
 	lf = slog.New()
 
 	lf.SetLevel(slf.LevelDebug)
+
+	if config.CallerInfo == true {
+		lf.SetCallerInfo(slf.CallerShort)
+	}
+
 	lf.SetEntryHandlers(logHandlers...)
 	slf.Set(lf)
 }
