@@ -65,7 +65,7 @@ func initLoggers(logC Config) {
 
 	lf.SetLevel(slf.LevelDebug)
 
-	if config.CallerInfo == true {
+	if config.CallerInfo == "true" {
 		lf.SetCallerInfo(slf.CallerShort)
 	}
 
