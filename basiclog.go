@@ -78,17 +78,18 @@ func New(level ...slf.Level) *Handler {
 	return res
 }
 
-func ConfigFileOutput(logHandlers *[]slog.EntryHandler, lvl slf.Level, fileName string) {
+func ConfigFileOutput(logHandlers *[]slog.EntryHandler, lvl slf.Level, fileName string) error {
 
 	bHandler := New(lvl)
 	logfd, err := os.OpenFile(fileName, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0644)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "[basiclog.go] Error: could not open/create logfile: %s\n", fileName)
+		fmt.Fprintf(os.Stderr, "[basiclog.go] Error: could not open/create logfile: %s %v\n", fileName, err)
+		return err
 	}
 
 	bHandler.SetWriter(logfd)
 	*logHandlers = append(*logHandlers, bHandler)
-
+	return nil
 }
 
 func ConfigWriterOutput(logHandlers *[]slog.EntryHandler, lvl slf.Level, fd io.Writer) {
