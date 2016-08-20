@@ -128,10 +128,10 @@ func (h *Handler) SetColors(colors map[slf.Level]int) {
 // Handle outputs a textual representation of the log entry into a text writer (stderr, file etc.).
 func (h *Handler) Handle(e slog.Entry) (err error) {
 
-	if entryLvlPassHandlerLvl(h.Level, e.Level()) == false {
-		return nil
+	if e.Level()<h.Level {
+		return
 	}
-
+	
 	defer func() {
 		if r := recover(); r != nil {
 			err = fmt.Errorf("%v", r)
@@ -234,35 +234,3 @@ func (sf sortablefields) Less(i, j int) bool {
 	return sf[i].key < sf[j].key
 }
 
-func entryLvlPassHandlerLvl(hLvl, eLvl slf.Level) bool {
-
-	hLvlValue := getLevelCode(hLvl)
-	eLvlValue := getLevelCode(eLvl)
-
-	if eLvlValue >= hLvlValue {
-		return true
-	} else {
-		return false
-	}
-}
-
-func getLevelCode(l slf.Level) int {
-
-	switch l {
-	case slf.LevelDebug:
-		return 0
-	case slf.LevelInfo:
-		return 1
-	case slf.LevelWarn:
-		return 2
-	case slf.LevelError:
-		return 3
-	case slf.LevelPanic:
-		return 4
-	case slf.LevelFatal:
-		return 5
-	default:
-		fmt.Errorf("getLevelCode: unknown level %d", int(l))
-		return 0
-	}
-}
