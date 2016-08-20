@@ -128,10 +128,10 @@ func (h *Handler) SetColors(colors map[slf.Level]int) {
 // Handle outputs a textual representation of the log entry into a text writer (stderr, file etc.).
 func (h *Handler) Handle(e slog.Entry) (err error) {
 
-	if e.Level()<h.Level {
+	if e.Level() < h.Level {
 		return
 	}
-	
+
 	defer func() {
 		if r := recover(); r != nil {
 			err = fmt.Errorf("%v", r)
@@ -233,4 +233,3 @@ func (sf sortablefields) Swap(i, j int) {
 func (sf sortablefields) Less(i, j int) bool {
 	return sf[i].key < sf[j].key
 }
-

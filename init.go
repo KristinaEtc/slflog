@@ -12,17 +12,46 @@ import (
 )
 
 var (
-	bhDebug, bhInfo, bhError, bhDebugConsole, bhStdError *Handler
-	logfileInfo, logfileDebug, logfileError              *os.File
-	lf                                                   slog.LogFactory
-	log                                                  slf.StructuredLogger
+	//bhDebug, bhInfo, bhError, bhDebugConsole, bhStdError *Handler
+	//logfileInfo, logfileDebug, logfileError              *os.File
+
+	handlers *Handler
+	lf       slog.LogFactory
+	log      slf.StructuredLogger
 )
+
+//handler config
+type HandlerConfig struct {
+	Type     string
+	Filename string
+	Level    string
+}
+
+/*
+func (HandlerConfig *) UnmarshalJSON([]byte) error {
+	optionsMap := make(map[string]interface{})
+	err := json.Unmarshal(optionsMap)
+	if err!=nil {
+		fmt.Fprintf(os.Stderr, "Error parse json %s %v", string(byte), err)
+		return err
+	}
+	type, ok := optionsMap["Type"]
+	if !ok {
+		fmt.Fprintf(os.Stderr, "'Type' attribute not found %s", string(byte))
+		return fmt.Errorf("'Type' attribute not found %s", string(byte))
+	}
+	switch(type){
+	case "file":
+
+	}
+}
+*/
 
 // Struct for log config.
 type Config struct {
-	StderrLvl string
-	Logpath   string
-	Filenames map[string]string
+	Logpath    string
+	CallerInfo bool
+	Handlers   []HandlerConfig
 }
 
 // ConfFile is a file with all program options
@@ -32,13 +61,15 @@ type ConfFile struct {
 
 var logConfig = ConfFile{
 	Logs: Config{
-		Filenames: map[string]string{"ERROR": "errors.log", "INFO": "info.log", "DEBUG": "debug.log"},
-		StderrLvl: "DEBUG",
-		Logpath:   "",
+		Logpath:    "logs",
+		CallerInfo: false,
+		Handlers:   []HandlerConfig{HandlerConfig{Type: "stderr", Level: "INFO"}},
 	},
 }
 
-//var configLogFile string = ""
+func logLogF(format string, args ...interface{}) {
+	fmt.Fprintf(os.Stderr, format, args...)
+}
 
 // Searching configuration log file.
 // Parsing configuration on it. If file doesn't exist, use default settings.
@@ -50,22 +81,34 @@ func init() {
 }
 
 // Init loggers: writers, log output, entry handlers.
-func initLoggers(logC Config) {
+func initLoggers(cfg Config) {
 
-	var logHandlers []slog.EntryHandler
+	var logHandlers []slog.EntryHandler = nil
 
-	ConfigWriterOutput(&logHandlers, getLogLevel(logC.StderrLvl), os.Stderr)
-
-	err := setLogOutput(&logHandlers, logC)
+	err := initLogPath(cfg)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "[slflog] Error init loggers: %s\n", err.Error())
+		logLogF("error initLogPath %v\n", err)
+	}
+	if config.Verbose() {
+		logLogF("initLogPath %s", cfg.Logpath)
+	}
+
+	for _, hCfg := range cfg.Handlers {
+		level := getLogLevel(hCfg.Level)
+		switch hCfg.Type {
+		case "stderr":
+			ConfigWriterOutput(&logHandlers, level, os.Stderr)
+		default:
+			ConfigFileOutput(&logHandlers, level, filepath.Join(cfg.Logpath, hCfg.Filename))
+			//logLogF("Unknown handler type in %v\n", hCfg)
+		}
 	}
 
 	lf = slog.New()
 
 	lf.SetLevel(slf.LevelDebug)
 
-	if config.CallerInfo == "true" {
+	if cfg.CallerInfo {
 		lf.SetCallerInfo(slf.CallerShort)
 	}
 
@@ -73,9 +116,8 @@ func initLoggers(logC Config) {
 	slf.Set(lf)
 }
 
-func setLogOutput(logHandlers *[]slog.EntryHandler, logC Config) error {
-
-	pathForLogs, err := getPathForLogDir(logC.Logpath)
+func initLogPath(cfg Config) error {
+	pathForLogs, err := getPathForLogDir(cfg.Logpath)
 	if err != nil {
 		return err
 	}
@@ -90,12 +132,7 @@ func setLogOutput(logHandlers *[]slog.EntryHandler, logC Config) error {
 		}
 	}
 
-	logC.Logpath = pathForLogs
-
-	ConfigFileOutput(logHandlers, slf.LevelDebug, filepath.Join(logC.Logpath, logC.Filenames["DEBUG"]))
-	ConfigFileOutput(logHandlers, slf.LevelInfo, filepath.Join(logC.Logpath, logC.Filenames["INFO"]))
-	ConfigFileOutput(logHandlers, slf.LevelError, filepath.Join(logC.Logpath, logC.Filenames["ERROR"]))
-
+	cfg.Logpath = pathForLogs
 	return nil
 }
 
