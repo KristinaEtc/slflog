@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"runtime"
 	"sort"
 	"strings"
 	"sync"
@@ -56,12 +57,20 @@ type Handler struct {
 // New constructs a new handler with default template, time formatting, colours and stderr as
 // output.
 func New(level ...slf.Level) *Handler {
+
+	var logTemplate string
+	if runtime.GOOS == "windows" {
+		logTemplate = StandardTextTemplate
+	} else {
+		logTemplate = StandardTermTemplate
+	}
+
 	res := &Handler{
 		writer:        os.Stderr,
 		colors:        make(map[slf.Level]int),
-		templateStr:   StandardTermTemplate,
+		templateStr:   logTemplate,
 		timeFormatStr: StandardTimeFormat,
-		template:      template.Must(template.New("entry").Parse(StandardTermTemplate + "\n")),
+		template:      template.Must(template.New("entry").Parse(logTemplate + "\n")),
 	}
 	if level == nil {
 		// TODO: CHANGE TO ROOTLEVEL
