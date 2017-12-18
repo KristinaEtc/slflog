@@ -6,9 +6,9 @@ import (
 	"path/filepath"
 
 	"github.com/KristinaEtc/config"
+	"github.com/KristinaEtc/slf"
+	"github.com/KristinaEtc/slog"
 	"github.com/kardianos/osext"
-	"github.com/ventu-io/slf"
-	"github.com/ventu-io/slog"
 )
 
 var (
@@ -76,6 +76,7 @@ func logLogF(format string, args ...interface{}) {
 func init() {
 
 	//var cf ConfFile = defaultConf
+	fmt.Print("aaaaaaaaaaa\n")
 	config.ReadGlobalConfig(&logConfig, "Logs")
 	initLoggers(logConfig.Logs)
 }
